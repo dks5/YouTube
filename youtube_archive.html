@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>dks5: Мой Видео-Архив</title>
+    <!-- Подключение Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключение Ionicons для иконок -->
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+
+    <style>
+        /* Стиль, имитирующий свечение с вашего скриншота */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a2e; /* Темно-синий/фиолетовый фон */
+            color: #e0e0e0; /* Светлый текст */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .neo-glow-box {
+            background-color: #2a2a4e; /* Чуть светлее фон */
+            border-radius: 1.5rem; /* 24px */
+            border: 1px solid #4a4a8a;
+            box-shadow: 0 0 25px rgba(173, 114, 239, 0.3), /* Фиолетовое свечение */
+                        0 0 10px rgba(173, 114, 239, 0.2) inset; /* Внутреннее свечение */
+            transition: all 0.3s ease;
+        }
+
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+
+        /* Кастомный стиль для кнопок "опасных" действий */
+        .btn-danger {
+            background-color: #991b1b; /* red-800 */
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #b91c1c; /* red-700 */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Заголовок страницы -->
+    <header class="text-center w-full max-w-6xl mx-auto mb-8">
+        <h1 class="text-4xl md:text-5xl font-bold text-violet-300 mb-2">dks5: Мой Видео-Архив</h1>
+        <p class="text-lg md:text-xl text-gray-400 mb-6">Управление категориями и ссылками на видео</p>
+        
+        <!-- Кнопки входа/выхода -->
+        <div class="flex justify-center space-x-4 mb-6">
+            <button id="signin-button" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-5 rounded-lg transition-all flex items-center space-x-2">
+                <ion-icon name="logo-github"></ion-icon>
+                <span>Войти (Админ)</span>
+            </button>
+            <button id="signout-button" class="hidden bg-gray-700 hover:bg-gray-600 text-white py-2 px-5 rounded-lg transition-all flex items-center space-x-2">
+                <ion-icon name="log-out-outline"></ion-icon>
+                <span>Выйти</span>
+            </button>
+        </div>
+        <!-- Индикатор пользователя -->
+        <p id="user-display" class="hidden text-green-400 mb-6"></p>
+
+        <!-- Кнопки управления (Экспорт, Импорт, Сброс) -->
+        <div class="flex justify-center items-center space-x-2 sm:space-x-4 flex-wrap gap-2">
+            <!-- Обертка для импорта, будет управляться JS -->
+            <div id="import-button-wrapper" class="relative inline-block" style="display: none;">
+                <button onclick="document.getElementById('import-file-input').click()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg transition-all flex items-center space-x-2">
+                    <ion-icon name="cloud-upload-outline"></ion-icon>
+                    <span>Импорт JSON</span>
+                </button>
+                <input type="file" id="import-file-input" class="hidden" accept=".json">
+            </div>
+
+            <button id="export-button" class="bg-green-600 hover:bg-green-500 text-white font-semibold py-2 px-4 rounded-lg transition-all flex items-center space-x-2" style="display: none;">
+                <ion-icon name="cloud-download-outline"></ion-icon>
+                <span>Экспорт JSON</span>
+            </button>
+            
+            <button id="reset-button" class="btn-danger hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-all flex items-center space-x-2" style="display: none;">
+                <ion-icon name="trash-bin-outline"></ion-icon>
+                <span>Сброс данных</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Контент -->
+    <main id="main-content" class="w-full max-w-6xl mx-auto">
+        <!-- Индикатор загрузки -->
+        <div id="loading-indicator" class="text-center text-lg text-gray-400 p-10">
+            <p>Загрузка данных из Firebase...</p>
+            <p id="error-message" class="text-red-400 font-bold mt-4"></p>
+        </div>
+
+        <!-- Контейнер для формы добавления категории (виден только админу) -->
+        <div id="add-category-box" class="neo-glow-box p-6 mb-8" style="display: none;">
+            <form id="add-category-form" class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="category-name-input" placeholder="Название новой категории" class="flex-grow bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500" required>
+                <button type="submit" class="bg-violet-600 hover:bg-violet-500 text-white font-semibold py-3 px-6 rounded-lg transition-all flex justify-center items-center space-x-2">
+                    <ion-icon name="add-circle-outline"></ion-icon>
+                    <span>Создать категорию</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Контейнер для категорий -->
+        <div id="categories-container" class="space-y-8">
+            <!-- Категории будут рендериться здесь -->
+        </div>
+    </main>
+
+    <!-- Модальное окно для добавления/редактирования видео -->
+    <div id="video-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+        <div class="neo-glow-box w-full max-w-lg p-6 relative">
+            <h3 id="video-modal-title" class="text-2xl font-bold text-violet-300 mb-6">Добавить видео</h3>
+            <form id="video-form">
+                <input type="hidden" id="video-id-input">
+                <input type="hidden" id="category-id-input">
+                <div class="mb-4">
+                    <label for="video-name-input" class="block text-sm font-medium text-gray-300 mb-2">Название видео</label>
+                    <input type="text" id="video-name-input" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="video-url-input" class="block text-sm font-medium text-gray-300 mb-2">URL (ссылка)</label>
+                    <input type="url" id="video-url-input" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500" required>
+                </div>
+                <div class="mb-6">
+                    <label for="video-desc-input" class="block text-sm font-medium text-gray-300 mb-2">Описание (по желанию)</label>
+                    <textarea id="video-desc-input" rows="3" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"></textarea>
+                </div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="cancel-video-modal" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-5 rounded-lg transition-all">Отмена</button>
+                    <button type="submit" class="bg-green-600 hover:bg-green-500 text-white font-semibold py-2 px-5 rounded-lg transition-all">Сохранить</button>
+                </div>
+            </form>
+            <button id="close-video-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white transition-all">
+                <ion-icon name="close-outline" class="text-3xl"></ion-icon>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Модальное окно для кастомного confirm() -->
+    <div id="custom-confirm-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop hidden">
+        <div class="neo-glow-box w-full max-w-md p-6 relative">
+            <h3 id="custom-confirm-title" class="text-2xl font-bold text-yellow-300 mb-4">Требуется подтверждение</h3>
+            <p id="custom-confirm-text" class="text-gray-300 mb-6">Вы уверены?</p>
+            <div class="flex justify-end space-x-4">
+                <button id="custom-confirm-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-5 rounded-lg transition-all">Отмена</button>
+                <button id="custom-confirm-ok" class="bg-red-600 hover:bg-red-500 text-white font-semibold py-2 px-5 rounded-lg transition-all">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ====================================================== -->
+    <!-- Скрипт Firebase и логика приложения -->
+    <!-- ====================================================== -->
+    <script type="module">
+        // Импорт необходимых функций Firebase
+        import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            GithubAuthProvider,
+            signInWithPopup,
+            signOut,
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            addDoc, 
+            setDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            collection, 
+            query, 
+            where, 
+            getDocs,
+            writeBatch
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Глобальные переменные ---
+        
+        // =======================================================================
+        // 1. НАСТРОЙКА ДЛЯ GITHUB PAGES
+        // =======================================================================
+        // ВАМ НУЖНО ВРУЧНУЮ ЗАПОЛНИТЬ ЭТИ ДАННЫЕ
+        // Вы можете получить их из среды Canvas (из __firebase_config и __app_id)
+        
+        const MANUAL_FIREBASE_CONFIG = null; 
+        // Пример: { apiKey: "AIza...", authDomain: "my-project.firebaseapp.com", ... }
+        
+        const MANUAL_APP_ID = null; 
+        // Пример: "1a2b3c4d-abcd-1234-..."
+        
+        // 2. ВАЖНО! Установите здесь свой UID администратора
+        // Инструкции о том, как его найти, находятся в моем ответе в чате.
+        const ADMIN_UID = "YOUR_FIREBASE_UID_HERE"; 
+        // Пример: "a1b2c3d4E5F6g7H8i9J0kL"
+        // =======================================================================
+        
+        let db, auth, userId, appId;
+        let categoriesCollectionRef; // Ссылка на коллекцию категорий
+        let unsubscribeCategories = null; // Функция отписки от слушателя
+
+        // Элементы UI
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const errorMessage = document.getElementById('error-message');
+        const categoriesContainer = document.getElementById('categories-container');
+        
+        const importButtonWrapper = document.getElementById('import-button-wrapper');
+        const importFileInput = document.getElementById('import-file-input');
+        
+        const exportButton = document.getElementById('export-button');
+        const resetButton = document.getElementById('reset-button');
+        
+        const signinButton = document.getElementById('signin-button');
+        const signoutButton = document.getElementById('signout-button');
+        const userDisplay = document.getElementById('user-display');
+        
+        const addCategoryBox = document.getElementById('add-category-box');
+        const addCategoryForm = document.getElementById('add-category-form');
+        const categoryNameInput = document.getElementById('category-name-input');
+
+        // Элементы модального окна видео
+        const videoModal = document.getElementById('video-modal');
+        const videoModalTitle = document.getElementById('video-modal-title');
+        const videoForm = document.getElementById('video-form');
+        const videoIdInput = document.getElementById('video-id-input');
+        const categoryIdInput = document.getElementById('category-id-input');
+        const videoNameInput = document.getElementById('video-name-input');
+        const videoUrlInput = document.getElementById('video-url-input');
+        const videoDescInput = document.getElementById('video-desc-input');
+        const cancelVideoModal = document.getElementById('cancel-video-modal');
+        const closeVideoModal = document.getElementById('close-video-modal');
+        
+        // Элементы модального окна подтверждения
+        const confirmModal = document.getElementById('custom-confirm-modal');
+        const confirmTitle = document.getElementById('custom-confirm-title');
+        const confirmText = document.getElementById('custom-confirm-text');
+        const confirmCancel = document.getElementById('custom-confirm-cancel');
+        const confirmOk = document.getElementById('custom-confirm-ok');
+        let confirmResolve = null; // Для Promise кастомного confirm
+
+        
+        // --- Инициализация Firebase ---
+        
+        async function initFirebase() {
+            try {
+                let firebaseConfig, canvasAppId;
+                
+                // СНАЧАЛА проверяем, запущены ли мы в Canvas
+                if (typeof __firebase_config !== 'undefined' && typeof __app_id !== 'undefined') {
+                    // Мы в Canvas
+                    console.log("Running in Canvas environment.");
+                    firebaseConfig = JSON.parse(__firebase_config);
+                    canvasAppId = __app_id;
+                } 
+                // ИНАЧЕ, используем ручную конфигурацию (для GitHub Pages)
+                else if (MANUAL_FIREBASE_CONFIG && MANUAL_APP_ID) {
+                    // Мы на GitHub Pages (конфигурация введена вручную)
+                    console.log("Running in production (GitHub) with manual config.");
+                    firebaseConfig = MANUAL_FIREBASE_CONFIG;
+                    canvasAppId = MANUAL_APP_ID;
+                } 
+                // ИНАЧЕ, конфигурация не найдена
+                else {
+                    throw new Error("Firebase config not found. Please fill in MANUAL_FIREBASE_CONFIG and MANUAL_APP_ID in the script to run on GitHub.");
+                }
+
+                appId = canvasAppId; // Устанавливаем глобальный appId
+                
+                // Инициализация Firebase
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // Включаем логирование для отладки
+                setLogLevel('debug');
+                
+                // Путь к публичной коллекции
+                const collectionPath = `artifacts/${appId}/public/data/categories`;
+                console.log("Using PUBLIC collection path:", collectionPath);
+                categoriesCollectionRef = collection(db, collectionPath);
+
+                // Слушатель аутентификации
+                onAuthStateChanged(auth, (user) => {
+                    // Этот слушатель вызывается при входе, выходе и анонимном входе
+                    
+                    if (user) {
+                        // Пользователь вошел (анонимно ИЛИ через GitHub)
+                        console.log("User is authenticated:", user.uid);
+                        console.log("Is user anonymous?", user.isAnonymous);
+                        
+                        userId = user.uid; // UID (анонимный или реальный)
+                        
+                        // Логика определения Администратора
+                        const isAdmin = user && user.uid === ADMIN_UID && !user.isAnonymous;
+                        console.log(`isAdmin check: ${isAdmin} (UID: ${user.uid} vs ${ADMIN_UID})`);
+
+                        // Настраиваем UI и слушатель данных на основе статуса Админа
+                        setupInterface(user, isAdmin);
+                        setupCategoriesListener(isAdmin); // Передаем флаг админа
+
+                    } else {
+                        // Пользователя нет (например, после signOut), входим анонимно
+                        console.log("User is not authenticated. Signing in anonymously...");
+                        signInAnonymously(auth).catch(error => {
+                            console.error("Anonymous sign-in error:", error);
+                            loadingIndicator.textContent = `Ошибка анонимного входа: ${error.message}`;
+                            errorMessage.textContent = `Ошибка анонимного входа: ${error.message}`;
+                        });
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                loadingIndicator.textContent = "Ошибка инициализации Firebase.";
+                errorMessage.textContent = error.message;
+            }
+        }
+        
+        // --- Настройка UI ---
+        
+        function setupInterface(user, isAdmin) {
+            // Скрываем/показываем элементы управления на основе статуса 'isAdmin'
+            const adminDisplay = isAdmin ? 'flex' : 'none'; // 'flex' для кнопок
+            const adminBlockDisplay = isAdmin ? 'block' : 'none'; // 'block' для контейнеров
+            const adminInlineBlockDisplay = isAdmin ? 'inline-block' : 'none'; // 'inline-block' для обертки импорта
+
+            addCategoryBox.style.display = adminBlockDisplay;
+            exportButton.style.display = adminDisplay;
+            importButtonWrapper.style.display = adminInlineBlockDisplay;
+            resetButton.style.display = adminDisplay;
+
+            // Управляем кнопками Входа/Выхода
+            if (user.isAnonymous) {
+                signinButton.style.display = 'flex';
+                signoutButton.style.display = 'none';
+                userDisplay.classList.add('hidden');
+            } else {
+                // Пользователь вошел (либо Админ, либо кто-то другой)
+                signinButton.style.display = 'none';
+                signoutButton.style.display = 'flex';
+                
+                // Показываем, кто вошел
+                if (isAdmin) {
+                    userDisplay.textContent = `Вы вошли как: ${user.displayName || 'Администратор'}`;
+                    userDisplay.classList.remove('text-red-400');
+                    userDisplay.classList.add('text-green-400');
+                } else {
+                    userDisplay.textContent = `Вы вошли как: ${user.displayName} (Гость)`;
+                    userDisplay.classList.add('text-red-400');
+                    userDisplay.classList.remove('text-green-400');
+                }
+                userDisplay.classList.remove('hidden');
+                
+                // ВАЖНО: Выводим UID в консоль, чтобы админ мог его скопировать
+                if (user.uid !== ADMIN_UID) {
+                     console.warn(`--- ВАШ UID (для ADMIN_UID): ${user.uid} ---`);
+                }
+            }
+            
+            // Важно: нужно обновить отображение категорий, чтобы показать/скрыть кнопки в них
+            setupCategoriesListener(isAdmin);
+        }
+
+
+        // --- Управление категориями ---
+
+        // Настройка слушателя категорий
+        function setupCategoriesListener(isAdmin) {
+            if (unsubscribeCategories) {
+                unsubscribeCategories(); // Отписываемся от предыдущего слушателя
+            }
+            
+            if (!categoriesCollectionRef) {
+                console.error("categoriesCollectionRef is not initialized!");
+                loadingIndicator.textContent = "Ошибка: ссылка на коллекцию не инициализирована.";
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            
+            const q = query(categoriesCollectionRef);
+            
+            unsubscribeCategories = onSnapshot(q, (snapshot) => {
+                loadingIndicator.classList.add('hidden');
+                const categories = [];
+                snapshot.forEach(doc => {
+                    categories.push({ id: doc.id, ...doc.data() });
+                });
+                // Сортируем категории по имени для порядка
+                categories.sort((a, b) => a.name.localeCompare(b.name));
+                // Передаем 'isAdmin' в рендер
+                renderCategories(categories, isAdmin);
+            }, (error) => {
+                console.error("Error in onSnapshot listener:", error);
+                // Ошибка "Missing or insufficient permissions" обычно означает, что
+                // анонимный вход не может прочитать публичную коллекцию.
+                // Проверьте ваши Правила Безопасности (Firestore Rules)
+                if (error.code === 'permission-denied') {
+                     loadingIndicator.textContent = "Ошибка: Отказано в доступе.";
+                     errorMessage.innerHTML = `
+                        Не удалось загрузить данные. Вероятные причины:
+                        <br> 1. Неправильно введены <strong>MANUAL_FIREBASE_CONFIG</strong> или <strong>MANUAL_APP_ID</strong>.
+                        <br> 2. В <a href="https://console.firebase.google.com/" target="_blank" class="text-blue-300 underline">Консоли Firebase</a> не настроены <strong>Правила Безопасности</strong> (Firestore Rules).
+                        <br><br> (Для теста, установите правила: <code>allow read: if true;</code> для <code>/artifacts/{appId}/public/data/{document=**}</code>)
+                     `;
+                } else {
+                    loadingIndicator.textContent = "Ошибка загрузки данных.";
+                    errorMessage.textContent = `Ошибка: ${error.message}.`;
+                }
+            });
+        }
+
+        // Добавление категории
+        addCategoryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const categoryName = categoryNameInput.value.trim();
+            if (categoryName && categoriesCollectionRef) {
+                try {
+                    await addDoc(categoriesCollectionRef, {
+                        name: categoryName,
+                        videos: [] // Инициализируем пустым массивом видео
+                    });
+                    categoryNameInput.value = ''; // Очищаем поле
+                } catch (error) {
+                    console.error("Error adding category:", error);
+                }
+            }
+        });
+
+        // Редактирование названия категории
+        categoriesContainer.addEventListener('click', async (e) => {
+            const editBtn = e.target.closest('.edit-category-btn');
+            if (editBtn) {
+                const categoryId = editBtn.closest('[data-category-id]').dataset.categoryId;
+                const category = await getCategory(categoryId);
+                if (category) {
+                    const newName = prompt("Введите новое название категории:", category.name);
+                    if (newName && newName.trim() !== category.name) {
+                        try {
+                            const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+                            await updateDoc(categoryDocRef, { name: newName.trim() });
+                        } catch (error) {
+                            console.error("Error updating category name:", error);
+                        }
+                    }
+                }
+            }
+        });
+
+        // Удаление категории
+        categoriesContainer.addEventListener('click', async (e) => {
+            const deleteBtn = e.target.closest('.delete-category-btn');
+            if (deleteBtn) {
+                const categoryId = deleteBtn.closest('[data-category-id]').dataset.categoryId;
+                
+                const confirmed = await showCustomConfirm(
+                    "Удалить категорию?",
+                    "Вы уверены, что хотите удалить эту категорию и ВСЕ видео в ней? Это действие необратимо."
+                );
+
+                if (confirmed) {
+                    try {
+                        const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+                        await deleteDoc(categoryDocRef);
+                    } catch (error) {
+                        console.error("Error deleting category:", error);
+                    }
+                }
+            }
+        });
+
+        // --- Управление видео ---
+
+        // Показ модального окна (для добавления или редактирования)
+        categoriesContainer.addEventListener('click', async (e) => {
+            const addBtn = e.target.closest('.add-video-btn');
+            const editBtn = e.target.closest('.edit-video-btn');
+
+            if (addBtn) {
+                // Добавление видео
+                const categoryId = addBtn.closest('[data-category-id]').dataset.categoryId;
+                videoForm.reset();
+                videoModalTitle.textContent = "Добавить видео";
+                categoryIdInput.value = categoryId;
+                videoIdInput.value = ""; // Очищаем ID видео
+                videoModal.classList.remove('hidden');
+            } else if (editBtn) {
+                // Редактирование видео
+                const categoryId = editBtn.closest('[data-category-id]').dataset.categoryId;
+                const videoId = editBtn.dataset.videoId;
+                const category = await getCategory(categoryId);
+                if (category && category.videos) {
+                    const video = category.videos.find(v => v.id === videoId);
+                    if (video) {
+                        videoModalTitle.textContent = "Редактировать видео";
+                        categoryIdInput.value = categoryId;
+                        videoIdInput.value = video.id;
+                        videoNameInput.value = video.name || '';
+                        videoUrlInput.value = video.url || '';
+                        videoDescInput.value = video.description || '';
+                        videoModal.classList.remove('hidden');
+                    }
+                }
+            }
+        });
+
+        // Скрытие модального окна
+        function hideVideoModal() {
+            videoModal.classList.add('hidden');
+        }
+        cancelVideoModal.addEventListener('click', hideVideoModal);
+        closeVideoModal.addEventListener('click', hideVideoModal);
+
+        // Сохранение (добавление или обновление) видео
+        videoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const categoryId = categoryIdInput.value;
+            const videoId = videoIdInput.value; // Будет пустым для нового видео
+            const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+
+            try {
+                const categorySnap = await getDoc(categoryDocRef);
+                if (!categorySnap.exists()) {
+                    throw new Error("Category not found");
+                }
+                
+                let videos = categorySnap.data().videos || [];
+                
+                if (videoId) {
+                    // Редактирование
+                    videos = videos.map(v => 
+                        v.id === videoId 
+                        ? { ...v, name: videoNameInput.value, url: videoUrlInput.value, description: videoDescInput.value }
+                        : v
+                    );
+                } else {
+                    // Добавление
+                    const newVideo = {
+                        id: crypto.randomUUID(), // Генерируем ID
+                        name: videoNameInput.value,
+                        url: videoUrlInput.value,
+                        description: videoDescInput.value
+                    };
+                    videos.push(newVideo);
+                }
+                
+                await updateDoc(categoryDocRef, { videos: videos });
+                hideVideoModal();
+
+            } catch (error) {
+                console.error("Error saving video:", error);
+            }
+        });
+
+        // Удаление видео
+        categoriesContainer.addEventListener('click', async (e) => {
+            const deleteBtn = e.target.closest('.delete-video-btn');
+            if (deleteBtn) {
+                const categoryId = deleteBtn.closest('[data-category-id]').dataset.categoryId;
+                const videoId = deleteBtn.dataset.videoId;
+                
+                const confirmed = await showCustomConfirm(
+                    "Удалить видео?",
+                    "Вы уверены, что хотите удалить это видео?"
+                );
+
+                if (confirmed) {
+                    const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+                    try {
+                        const categorySnap = await getDoc(categoryDocRef);
+                        if (categorySnap.exists()) {
+                            let videos = categorySnap.data().videos || [];
+                            videos = videos.filter(v => v.id !== videoId); // Удаляем видео
+                            await updateDoc(categoryDocRef, { videos: videos });
+                        }
+                    } catch (error) {
+                        console.error("Error deleting video:", error);
+                    }
+                }
+            }
+        });
+
+
+        // --- Аутентификация GitHub ---
+        
+        // Вход через GitHub
+        async function signInWithGitHub() {
+            const provider = new GithubAuthProvider();
+            try {
+                console.log("Attempting GitHub sign-in...");
+                await signInWithPopup(auth, provider);
+                // onAuthStateChanged автоматически обработает результат
+                console.log("GitHub sign-in successful.");
+            } catch (error) {
+                console.error("GitHub sign-in error:", error);
+                // alert(`Ошибка входа: ${error.message}`);
+            }
+        }
+
+        // Выход
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                console.log("User signed out.");
+                // onAuthStateChanged увидит 'null' и автоматически вызовет signInAnonymously
+            } catch (error) {
+                console.error("Sign-out error:", error);
+            }
+        }
+        
+        // Назначаем обработчики на кнопки
+        signinButton.addEventListener('click', signInWithGitHub);
+        signoutButton.addEventListener('click', signOutUser);
+
+
+        // --- Импорт / Экспорт / Сброс ---
+
+        // Импорт
+        importFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data || !Array.isArray(data.categories)) {
+                        throw new Error("Invalid JSON format. Expected { categories: [...] }");
+                    }
+                    
+                    const confirmed = await showCustomConfirm(
+                        "Начать импорт?",
+                        "ВНИМАНИЕ: Импорт добавит все категории из файла. Это может создать дубликаты. Продолжить?"
+                    );
+                    
+                    if (confirmed) {
+                        const batch = writeBatch(db);
+                        data.categories.forEach(category => {
+                            // Создаем новую ссылку (новый ID)
+                            const newCategoryRef = doc(collection(db, categoriesCollectionRef.path));
+                            
+                            // Готовим данные, удаляя старый ID
+                            const newCategoryData = { ...category };
+                            delete newCategoryData.id; 
+                            
+                            // Убедимся, что у видео есть ID
+                            if (Array.isArray(newCategoryData.videos)) {
+                                newCategoryData.videos = newCategoryData.videos.map(v => ({
+                                    ...v,
+                                    id: v.id || crypto.randomUUID()
+                                }));
+                            } else {
+                                newCategoryData.videos = [];
+                            }
+                            
+                            batch.set(newCategoryRef, newCategoryData);
+                        });
+                        await batch.commit();
+                        alert("Импорт успешно завершен!");
+                    }
+                } catch (error) {
+                    console.error("Error importing JSON:", error);
+                    alert(`Ошибка импорта: ${error.message}`);
+                } finally {
+                    // Сбрасываем input, чтобы можно было загрузить тот же файл
+                    event.target.value = null;
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Экспорт
+        exportButton.addEventListener('click', async () => {
+            try {
+                const snapshot = await getDocs(categoriesCollectionRef);
+                const categories = [];
+                snapshot.forEach(doc => {
+                    categories.push({ id: doc.id, ...doc.data() });
+                });
+                
+                const data = {
+                    categories: categories,
+                    exportedAt: new Date().toISOString()
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'dks5_youtube_archive.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error("Error exporting JSON:", error);
+                alert(`Ошибка экспорта: ${error.message}`);
+            }
+        });
+        
+        // Сброс данных
+        resetButton.addEventListener('click', async () => {
+            const confirmed1 = await showCustomConfirm(
+                "СБРОС ДАННЫХ",
+                "Вы уверены, что хотите УДАЛИТЬ ВСЕ категории и видео? Это действие НЕОБРАТИМО."
+            );
+            
+            if (!confirmed1) return;
+            
+            const confirmed2 = await showCustomConfirm(
+                "ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ",
+                "Точно уверены? Все данные будут стерты навсегда."
+            );
+            
+            if (confirmed2) {
+                try {
+                    loadingIndicator.classList.remove('hidden');
+                    loadingIndicator.textContent = "Удаление данных...";
+                    
+                    const snapshot = await getDocs(categoriesCollectionRef);
+                    const batch = writeBatch(db);
+                    snapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    await batch.commit();
+                    
+                    loadingIndicator.classList.add('hidden');
+                    alert("Все данные успешно удалены.");
+                } catch (error) {
+                    console.error("Error resetting data:", error);
+                    alert(`Ошибка сброса: ${error.message}`);
+                    loadingIndicator.classList.add('hidden');
+                }
+            }
+        });
+
+
+        // --- Отрисовка (Рендеринг) ---
+        
+        // Рендер категорий
+        function renderCategories(categories, isAdmin) {
+            categoriesContainer.innerHTML = ''; // Очищаем контейнер
+            if (categories.length === 0) {
+                categoriesContainer.innerHTML = `
+                    <div class="text-center text-gray-400 py-10">
+                        <p class="text-xl">Категорий пока нет.</p>
+                        ${isAdmin ? '<strong>Создайте первую, используя форму выше.</strong>' : ''}
+                    </div>
+                `;
+                return;
+            }
+
+            categories.forEach(category => {
+                const categoryElement = document.createElement('div');
+                categoryElement.className = 'neo-glow-box p-6';
+                categoryElement.dataset.categoryId = category.id;
+
+                // Сортируем видео по имени
+                const sortedVideos = (category.videos || []).sort((a, b) => a.name.localeCompare(b.name));
+
+                // Рендерим список видео
+                const videosHtml = sortedVideos.map(video => `
+                    <div class="video-item flex flex-col sm:flex-row justify-between sm:items-center gap-4 py-4 border-b border-gray-700 last:border-b-0">
+                        <div class="flex-grow min-w-0">
+                            <a href="${escapeHTML(video.url || '#')}" target="_blank" rel="noopener noreferrer" class="text-lg font-semibold text-blue-300 hover:text-blue-200 break-words transition-all">
+                                ${escapeHTML(video.name || 'Без названия')}
+                                <ion-icon name="open-outline" class="inline-block text-sm ml-1"></ion-icon>
+                            </a>
+                            <p class="text-gray-400 text-sm mt-1 break-words">${escapeHTML(video.description || 'Нет описания')}</p>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <!-- Скрываем кнопки на основе 'isAdmin' -->
+                            <div class="flex justify-end space-x-3">
+                                <button class="edit-video-btn text-gray-400 hover:text-yellow-400 transition-all" data-video-id="${video.id}" style="display: ${isAdmin ? 'block' : 'none'}">
+                                    <ion-icon name="create-outline" class="text-xl"></ion-icon>
+                                </button>
+                                <button class="delete-video-btn text-gray-400 hover:text-red-500 transition-all" data-video-id="${video.id}" style="display: ${isAdmin ? 'block' : 'none'}">
+                                    <ion-icon name="trash-bin-outline" class="text-xl"></ion-icon>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Собираем HTML категории
+                categoryElement.innerHTML = `
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+                        <h3 class="text-3xl font-bold text-violet-300 break-words">${escapeHTML(category.name)}</h3>
+                        <!-- Скрываем кнопки на основе 'isAdmin' -->
+                        <div class="flex space-x-2 flex-shrink-0" style="display: ${isAdmin ? 'flex' : 'none'}">
+                            <button class="edit-category-btn text-yellow-400 hover:text-yellow-300 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-all" title="Редактировать название">
+                                <ion-icon name="pencil-outline" class="text-xl"></ion-icon>
+                            </button>
+                            <button class="delete-category-btn text-red-500 hover:text-red-400 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-all" title="Удалить категорию">
+                                <ion-icon name="trash-outline" class="text-xl"></ion-icon>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="video-list space-y-4 mb-6">
+                        ${videosHtml.length > 0 ? videosHtml : `<p class="text-gray-500 text-center py-4">В этой категории пока нет видео.</p>`}
+                    </div>
+                    
+                    <!-- Скрываем кнопки на основе 'isAdmin' -->
+                    <button class="add-video-btn bg-green-600 hover:bg-green-500 text-white font-semibold py-2 px-5 rounded-lg transition-all flex items-center space-x-2" style="display: ${isAdmin ? 'flex' : 'none'}">
+                        <ion-icon name="add-outline"></ion-icon>
+                        <span>Добавить видео</span>
+                    </button>
+                `;
+                categoriesContainer.appendChild(categoryElement);
+            });
+        }
+
+
+        // --- Вспомогательные функции ---
+
+        // Экранирование HTML
+        function escapeHTML(str) {
+            if (typeof str !== 'string') return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[m];
+            });
+        }
+        
+        // Получение данных одной категории
+        async function getCategory(categoryId) {
+            if (!categoriesCollectionRef) return null;
+            try {
+                const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+                const categorySnap = await getDoc(categoryDocRef);
+                return categorySnap.exists() ? { id: categorySnap.id, ...categorySnap.data() } : null;
+            } catch (error) {
+                console.error("Error getting category:", error);
+                return null;
+            }
+        }
+        
+        // Кастомный Promise-based confirm
+        function showCustomConfirm(title, text) {
+            return new Promise((resolve) => {
+                confirmTitle.textContent = title;
+                confirmText.textContent = text;
+                confirmModal.classList.remove('hidden');
+                
+                confirmResolve = resolve; // Сохраняем resolve
+            });
+        }
+        
+        confirmOk.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            if (confirmResolve) confirmResolve(true);
+        });
+        
+        confirmCancel.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            if (confirmResolve) confirmResolve(false);
+        });
+
+
+        // --- Запуск приложения ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+        });
+    </script>
+</body>
+</html>
+
