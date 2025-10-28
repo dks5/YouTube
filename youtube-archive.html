@@ -780,23 +780,24 @@ const MANUAL_APP_ID = "youtube-archive-data";
                 // Сортируем видео по имени
                 const sortedVideos = (category.videos || []).sort((a, b) => a.name.localeCompare(b.name));
 
-                // Рендерим список видео
+                // Рендерим список видео   удалить
+                // Рендерим КАРТОЧКИ видео вставили
                 const videosHtml = sortedVideos.map(video => `
-                    <div class="video-item flex flex-col sm:flex-row justify-between sm:items-center gap-4 py-4 border-b border-gray-700 last:border-b-0">
+                    <div class="video-card bg-gray-800 rounded-lg p-4 shadow-lg flex flex-col h-full">
                         <div class="flex-grow min-w-0">
                             <a href="${escapeHTML(video.url || '#')}" target="_blank" rel="noopener noreferrer" class="text-lg font-semibold text-blue-300 hover:text-blue-200 break-words transition-all">
                                 ${escapeHTML(video.name || 'Без названия')}
                                 <ion-icon name="open-outline" class="inline-block text-sm ml-1"></ion-icon>
                             </a>
-                            <p class="text-gray-400 text-sm mt-1 break-words">${escapeHTML(video.description || 'Нет описания')}</p>
+                            <p class="text-gray-400 text-sm mt-2 break-words">${escapeHTML(video.description || 'Нет описания')}</p>
                         </div>
-                        <div class="flex-shrink-0">
-                            <!-- Скрываем кнопки на основе 'isAdmin' -->
+                        
+                        <div class="flex-shrink-0 pt-4 mt-4 border-t border-gray-700" style="display: ${isAdmin ? 'block' : 'none'}">
                             <div class="flex justify-end space-x-3">
-                                <button class="edit-video-btn text-gray-400 hover:text-yellow-400 transition-all" data-video-id="${video.id}" style="display: ${isAdmin ? 'block' : 'none'}">
+                                <button class="edit-video-btn text-gray-400 hover:text-yellow-400 transition-all" data-video-id="${video.id}" title="Редактировать">
                                     <ion-icon name="create-outline" class="text-xl"></ion-icon>
                                 </button>
-                                <button class="delete-video-btn text-gray-400 hover:text-red-500 transition-all" data-video-id="${video.id}" style="display: ${isAdmin ? 'block' : 'none'}">
+                                <button class="delete-video-btn text-gray-400 hover:text-red-500 transition-all" data-video-id="${video.id}" title="Удалить">
                                     <ion-icon name="trash-bin-outline" class="text-xl"></ion-icon>
                                 </button>
                             </div>
@@ -819,10 +820,14 @@ const MANUAL_APP_ID = "youtube-archive-data";
                         </div>
                     </div>
                     
-                    <div class="video-list space-y-4 mb-6">
+<!--удалить                   <div class="video-list space-y-4 mb-6">
                         ${videosHtml.length > 0 ? videosHtml : `<p class="text-gray-500 text-center py-4">В этой категории пока нет видео.</p>`}
                     </div>
+--> 
+                    <div class="video-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                        ${videosHtml} </div>
                     
+                    ${videosHtml.length === 0 ? `<p class="text-gray-500 text-center py-4">В этой категории пока нет видео.</p>` : ''}
                     <!-- Скрываем кнопки на основе 'isAdmin' -->
                     <button class="add-video-btn bg-green-600 hover:bg-green-500 text-white font-semibold py-2 px-5 rounded-lg transition-all flex items-center space-x-2" style="display: ${isAdmin ? 'flex' : 'none'}">
                         <ion-icon name="add-outline"></ion-icon>
