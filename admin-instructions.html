@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Инструкция по Доступу к Архиву</title>
+    <!-- Подключение Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Подключение Ionicons для иконок -->
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .neo-glow-box {
+            background-color: #2a2a4e;
+            border-radius: 1.5rem; /* 24px */
+            border: 1px solid #4a4a8a;
+            box-shadow: 0 0 25px rgba(173, 114, 239, 0.3), /* Фиолетовое свечение */
+                        0 0 10px rgba(173, 114, 239, 0.2) inset; /* Внутреннее свечение */
+        }
+        
+        /* Стили для кода */
+        pre {
+            background-color: #1e1e3f;
+            border: 1px solid #4a4a8a;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            overflow-x: auto; /* Для прокрутки на мобильных */
+            color: #c0c0ff;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #3a3a5e;
+            color: #f0f0ff;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            border-radius: 0;
+        }
+        
+        /* Заголовки разделов */
+        h2 {
+            font-size: 1.75rem; /* text-2xl */
+            font-weight: 700; /* font-bold */
+            color: #c4b5fd; /* text-violet-300 */
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #4a4a8a;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem; /* space-x-3 */
+        }
+        
+        h3 {
+            font-size: 1.25rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            color: #a78bfa; /* text-violet-400 */
+            margin-top: 1.5rem; /* mt-6 */
+        }
+        
+        li {
+            margin-top: 0.5rem; /* mt-2 */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Заголовок страницы -->
+    <header class="text-center w-full max-w-6xl mx-auto mb-8">
+        <h1 class="text-4xl md:text-5xl font-bold text-violet-300 mb-2">Инструкция по Управлению Доступом</h1>
+        <p class="text-lg md:text-xl text-gray-400 mb-6">Только для администратора</p>
+        
+        <!-- Кнопки входа/выхода -->
+        <div class="flex justify-center space-x-4 mb-6">
+            <button id="signin-button" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-5 rounded-lg transition-all flex items-center space-x-2">
+                <ion-icon name="logo-github"></ion-icon>
+                <span>Войти (Админ)</span>
+            </button>
+            <button id="signout-button" class="hidden bg-gray-700 hover:bg-gray-600 text-white py-2 px-5 rounded-lg transition-all flex items-center space-x-2">
+                <ion-icon name="log-out-outline"></ion-icon>
+                <span>Выйти</span>
+            </button>
+        </div>
+        
+        <!-- Индикатор пользователя -->
+        <p id="user-display" class="hidden text-green-400 mb-6"></p>
+
+        <!-- Индикатор Загрузки / Ошибки Доступа -->
+        <div id="loading-indicator" class="text-center text-lg text-yellow-400 p-10">
+            <p>Пожалуйста, войдите как Администратор.</p>
+        </div>
+    </header>
+
+    <!-- Контент Инструкции (скрыт по умолчанию) -->
+    <main id="main-content" class="w-full max-w-6xl mx-auto p-6 md:p-8 neo-glow-box space-y-6" style="display: none;">
+
+        <section>
+            <h2>
+                <ion-icon name="key-outline"></ion-icon>
+                Принцип работы системы
+            </h2>
+            <p class="mt-4">Ваша система безопасности состоит из двух независимых частей. Для предоставления доступа новому пользователю вам нужно будет вносить изменения в <strong>обе</strong>:</p>
+            <ul class="list-disc list-inside mt-4 space-y-2">
+                <li>
+                    <strong>1. Правила Безопасности Firebase (Сервер):</strong>
+                    <br>
+                    <span class="text-sm text-gray-400 pl-6"><strong>Задача:</strong> Определяет, имеет ли пользователь <strong>право</strong> <strong>читать</strong> данные (видео) или <strong>писать</strong> их (редактировать).</span>
+                    <br>
+                    <span class="text-sm text-gray-400 pl-6"><strong>Где:</strong> <code>Firebase Console</code> &rarr; <code>Firestore Database</code> &rarr; <code>Rules</code>.</span>
+                </li>
+                <li>
+                    <strong>2. Код <code>youtube-archive.html</code> (Клиент):</strong>
+                    <br>
+                    <span class="text-sm text-gray-400 pl-6"><strong>Задача:</strong> Определяет, <strong>показывать</strong> ли пользователю интерфейс (категории и видео) или скрывать его, а также какие кнопки (редактировать/удалить) отображать.</span>
+                    <br>
+                    <span class="text-sm text-gray-400 pl-6"><strong>Где:</strong> Ваш файл <code>youtube-archive.html</code> на GitHub.</span>
+                </li>
+            </ul>
+        </section>
+
+        <section class="mt-8">
+            <h2>
+                <ion-icon name="people-outline"></ion-icon>
+                Текущие пользователи
+            </h2>
+            <ul class="list-none mt-4 space-y-2">
+                <li>
+                    <strong>Администратор (Admin):</strong> (GitHub)
+                    <br>
+                    <span class="text-sm text-gray-400 pl-6"><strong>UID:</strong> <code>56vTQLliI7gcBuvOgKdFzBDl90y1</code></span>
+                    <br>
+                    <span class="text-sm text-gray-400 pl-6"><strong>Права:</strong> Полное чтение и запись (создание, редактирование, удаление).</span>
+                </li>
+                <li class="mt-2">
+                    <strong>Пользователь (Viewer):</strong> (Google)
+                    <br>
+                    <span class="text-sm text-gray-400 pl-6"><strong>UID:</strong> <code>pGNffia925Pb4lXcjTODFGtrNlL2</code></span>
+                    <br>
+                    <span class="text-sm text-gray-400 pl-6"><strong>Права:</strong> Только чтение.</span>
+                </li>
+            </ul>
+        </section>
+
+        <section class="mt-8">
+            <h2>
+                <ion-icon name="person-add-outline"></ion-icon>
+                Как добавить нового пользователя (Только для просмотра)
+            </h2>
+            
+            <h3 class="mt-4">Шаг 1: Включить Провайдер входа (Выполняется 1 раз)</h3>
+            <p>Если вы добавляете еще одного пользователя Google, этот шаг можно пропустить, так как Google уже включен. Если вы захотите добавить пользователя, который входит через (например) Twitter, вам нужно сначала "включить" этот способ входа.</p>
+            <ol class="list-decimal list-inside mt-2 space-y-1 text-gray-300">
+                <li>Перейдите в <strong>Firebase Console</strong> &rarr; <strong>Authentication</strong>.</li>
+                <li>Откройте вкладку <strong>Sign-in method</strong>.</li>
+                <li>Нажмите <strong>"Add new provider"</strong> и включите тот, который вам нужен.</li>
+            </ol>
+            
+            <h3 class="mt-6">Шаг 2: Получить Уникальный ID (UID) нового пользователя</h3>
+            <ol class="list-decimal list-inside mt-2 space-y-1 text-gray-300">
+                <li>Отправьте вашему новому пользователю ссылку на ваш тестовый файл:
+                    <br>
+                    <a href="https://dks5.github.io/YouTube/get_uid.html" target="_blank" rel="noopener" class="text-blue-300 underline"><code>https://dks5.github.io/YouTube/get_uid.html</code></a>
+                </li>
+                <li>Попросите его нажать кнопку "Войти через Google" (или другой способ) и войти в свой аккаунт.</li>
+                <li>Пользователь должен скопировать <strong>UID</strong>, который появится на экране, и отправить его вам.</li>
+            </ol>
+
+            <h3 class="mt-6">Шаг 3: Добавить UID в Правила Безопасности (Сервер)</h3>
+            <p>Это самый важный шаг. Он дает пользователю <strong>реальное право</strong> на чтение данных.</p>
+            <ol class="list-decimal list-inside mt-2 space-y-1 text-gray-300">
+                <li>Перейдите в <strong>Firebase Console</strong> &rarr; <strong>Firestore Database</strong> &rarr; <strong>Rules</strong> (Правила).</li>
+                <li>Найдите строку <code>allow read:</code>.</li>
+                <li>Добавьте <code>|| request.auth.uid == "НОВЫЙ_UID"</code> в конец строки.</li>
+            </ol>
+            <p class="mt-2 text-gray-400 text-sm">Было:</p>
+<pre><code>allow read: if request.auth.uid == "56vTQLliI7gcBuvOgKdFzBDl90y1" ||
+               request.auth.uid == "pGNffia925Pb4lXcjTODFGtrNlL2";</code></pre>
+            <p class="mt-2 text-gray-400 text-sm">Станет (Пример добавления пользователя <code>abc123xyz</code>):</p>
+<pre><code>allow read: if request.auth.uid == "56vTQLliI7gcBuvOgKdFzBDl90y1" ||
+               request.auth.uid == "pGNffia925Pb4lXcjTODFGtrNlL2" ||
+               request.auth.uid == "abc123xyz"; <strong class="text-green-300">// &lt;-- ДОБАВЛЕНО</strong></code></pre>
+            <ol class="list-decimal list-inside mt-2 space-y-1 text-gray-300" start="4">
+                <li>Нажмите <strong>"Publish"</strong> (Опубликовать).</li>
+            </ol>
+
+            <h3 class="mt-6">Шаг 4: Добавить UID в HTML-файл (Клиент)</h3>
+            <p>Этот шаг нужен, чтобы ваш сайт <code>youtube-archive.html</code> <strong>показал</strong> контент пользователю.</p>
+            <ol class="list-decimal list-inside mt-2 space-y-1 text-gray-300">
+                <li>Откройте ваш файл <code>youtube-archive.html</code> для редактирования.</li>
+                <li>Найдите константу <code>VIEWER_UID</code> (строка ~304).</li>
+                <li><strong>(Рекомендация)</strong> Превратите эту константу в массив (список) <code>VIEWER_UIDS</code>.</li>
+            </ol>
+            <p class="mt-2 text-gray-400 text-sm">Найдите этот код:</p>
+<pre><code>const ADMIN_UID = "56vTQLliI7gcBuvOgKdFzBDl90y1";
+const VIEWER_UID = "pGNffia925Pb4lXcjTODFGtrNlL2";</code></pre>
+            <p class="mt-2 text-gray-400 text-sm">Замените его на этот (с вашим новым UID):</p>
+<pre><code>const ADMIN_UID = "56vTQLliI7gcBuvOgKdFzBDl90y1";
+
+// Список UID всех пользователей с доступом "Только просмотр"
+const VIEWER_UIDS = [
+    "pGNffia925Pb4lXcjTODFGtrNlL2",
+    "abc123xyz" <strong class="text-green-300">// &lt;-- ДОБАВЬТЕ НОВЫЙ UID СЮДА</strong>
+];</code></pre>
+            <ol class="list-decimal list-inside mt-2 space-y-1 text-gray-300" start="4">
+                <li>Теперь найдите строку <code>const isViewer =</code> (примерно 366 строка).</li>
+                <li>Найдите этот код:
+<pre><code>const isAdmin = user.uid === ADMIN_UID;
+const isViewer = user.uid === VIEWER_UID;</code></pre>
+                </li>
+                <li>Замените его на этот, чтобы он проверял по списку:
+<pre><code>const isAdmin = user.uid === ADMIN_UID;
+const isViewer = VIEWER_UIDS.includes(user.uid);</code></pre>
+                </li>
+                <li>Сохраните и загрузите обновленный файл <code>youtube-archive.html</code> на GitHub.</li>
+            </ol>
+        </section>
+
+        <section class="mt-8">
+            <h2>
+                <ion-icon name="person-remove-outline"></ion-icon>
+                Как удалить пользователя
+            </h2>
+            <p class="mt-4">Удаление — это обратный процесс.</p>
+            <ol class="list-decimal list-inside mt-2 space-y-1 text-gray-300">
+                <li><strong>(Сервер):</strong> Перейдите в <strong>Firestore Database</strong> &rarr; <strong>Rules</strong>. Найдите UID пользователя и сотрите всю строку <code>|| request.auth.uid == "UID_ДЛЯ_УДАЛЕНИЯ"</code>. Нажмите <strong>"Publish"</strong>.</li>
+                <li><strong>(Клиент):</strong> Откройте <code>youtube-archive.html</code>. Найдите массив <code>VIEWER_UIDS</code> и удалите UID этого пользователя из списка. Сохраните и загрузите файл на GitHub.</li>
+                <li><strong>(Опционально):</strong> Перейдите в <strong>Firebase Console</strong> &rarr; <strong>Authentication</strong> &rarr; <strong>Users</strong>. Найдите пользователя в списке и выберите <strong>"Delete account"</strong>.</li>
+            </ol>
+        </section>
+        
+    </main>
+
+
+    <!-- ====================================================== -->
+    <!-- Скрипт Firebase и логика приложения -->
+    <!-- ====================================================== -->
+    <script type="module">
+        // Импорт необходимых функций Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            GithubAuthProvider,
+            signInWithPopup,
+            signOut,
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Firestore и GoogleAuth НЕ НУЖНЫ для этой страницы
+
+        // --- Глобальные переменные ---
+        
+        // =======================================================================
+        // 1. НАСТРОЙКА ДЛЯ GITHUB PAGES (Та же, что и у архива)
+        // =======================================================================
+        const MANUAL_FIREBASE_CONFIG = {
+            "apiKey": "AIzaSyAI2eGIMAHw3LWpRTATXBd2di6d2nJoj2w",
+            "authDomain": "archive-89fc1.firebaseapp.com",
+            "projectId": "archive-89fc1",
+            "storageBucket": "archive-89fc1.firebasestorage.app",
+            "messagingSenderId": "1023136270041",
+            "appId": "1:102313j0a:web:02af4902a9d9f53c4920c8"
+        };
+        const MANUAL_APP_ID = "youtube-archive-data"; // Тот же ID, что и у архива
+        
+        // 2. ВАЖНО! UID Администратора
+        const ADMIN_UID = "56vTQLliI7gcBuvOgKdFzBDl90y1"; // Ваш GitHub UID
+        // =======================================================================
+        
+        let auth; 
+
+        // Элементы UI
+        const mainContent = document.getElementById('main-content');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const signinButton = document.getElementById('signin-button');
+        const signoutButton = document.getElementById('signout-button');
+        const userDisplay = document.getElementById('user-display');
+
+        
+        // --- Инициализация Firebase ---
+        
+        async function initFirebase() {
+            try {
+                let firebaseConfig;
+                
+                if (typeof __firebase_config !== 'undefined') {
+                    firebaseConfig = JSON.parse(__firebase_config);
+                } 
+                else if (MANUAL_FIREBASE_CONFIG) {
+                    firebaseConfig = MANUAL_FIREBASE_CONFIG;
+                } 
+                else {
+                    throw new Error("Firebase config not found.");
+                }
+                
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        // Пользователь вошел
+                        console.log("User is authenticated:", user.uid);
+                        const isAdmin = user.uid === ADMIN_UID;
+                        setupInterface(user, isAdmin);
+                    } else {
+                        // Пользователя нет (вышел или не входил)
+                        console.log("User is not authenticated.");
+                        setupInterface(null, false);
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                loadingIndicator.textContent = `Ошибка инициализации Firebase: ${error.message}`;
+            }
+        }
+        
+        // --- Настройка UI ---
+        
+        function setupInterface(user, isAdmin) {
+            
+            if (!user) {
+                // --- Состояние: Пользователь не вошел ---
+                mainContent.style.display = 'none'; // Скрываем контент
+                signinButton.style.display = 'flex';
+                signoutButton.style.display = 'none';
+                userDisplay.classList.add('hidden');
+                loadingIndicator.textContent = "Пожалуйста, войдите как Администратор.";
+                
+            } else if (user && isAdmin) {
+                // --- Состояние: Пользователь = Админ ---
+                mainContent.style.display = 'block'; // Показываем контент
+                signinButton.style.display = 'none';
+                signoutButton.style.display = 'flex';
+                userDisplay.textContent = `Вы вошли как: ${user.displayName || 'Администратор'} (Админ)`;
+                userDisplay.classList.remove('text-red-400', 'hidden');
+                userDisplay.classList.add('text-green-400');
+                loadingIndicator.textContent = ""; // Очищаем
+            
+            } else if (user && !isAdmin) {
+                // --- Состояние: Пользователь = НЕ Админ ---
+                mainContent.style.display = 'none'; // Скрываем контент
+                signinButton.style.display = 'none'; // Скрываем кнопку входа
+                signoutButton.style.display = 'flex'; // Показываем выход
+                userDisplay.textContent = `Доступ запрещен для: ${user.displayName || 'Неизвестный'}`;
+                userDisplay.classList.remove('text-green-400', 'hidden');
+                userDisplay.classList.add('text-red-400');
+                loadingIndicator.textContent = "У вас нет прав для просмотра этой страницы.";
+            }
+        }
+
+
+        // --- Аутентификация ---
+        
+        // Вход через GitHub
+        async function signInWithGitHub() {
+            const provider = new GithubAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("GitHub sign-in error:", error);
+                loadingIndicator.textContent = `Ошибка входа: ${error.message}`;
+            }
+        }
+
+        // Выход
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                console.log("User signed out.");
+            } catch (error) {
+                console.error("Sign-out error:", error);
+            }
+        }
+        
+        // Назначаем обработчики на кнопки
+        signinButton.addEventListener('click', signInWithGitHub);
+        signoutButton.addEventListener('click', signOutUser);
+
+        // --- Запуск приложения ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+        });
+    </script>
+</body>
+</html>
