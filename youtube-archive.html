@@ -360,4 +360,549 @@
                     userDisplay.classList.add('text-green-400');
                 
                 } else if (isViewer) {
-                    // ---
+                    // --- Пользователь (Google) ---
+                    mainContent.style.display = 'block'; // Показываем контент
+                    // Админ-кнопки уже скрыты (см. начало функции)
+                    userDisplay.textContent = `Вы вошли как: ${user.displayName || 'Пользователь'} (Просмотр)`;
+                    userDisplay.classList.remove('text-red-400');
+                    userDisplay.classList.add('text-green-400');
+
+                } else {
+                    // --- Неавторизованный пользователь ---
+                    mainContent.style.display = 'none'; // Скрываем контент
+                    userDisplay.textContent = `Доступ запрещен для: ${user.displayName || user.email || 'Неизвестный'}`;
+                    userDisplay.classList.add('text-red-400');
+                    userDisplay.classList.remove('text-green-400');
+                    
+                    loadingIndicator.classList.remove('hidden');
+                    loadingIndicator.textContent = "У вас нет прав для просмотра этого архива.";
+                }
+                
+                // Выводим UID в консоль, чтобы админ мог его скопировать
+                if (user.uid !== ADMIN_UID && user.uid !== VIEWER_UID) {
+                     console.warn(`--- UID НЕАВТОРИЗОВАННОГО ПОЛЬЗОВАТЕЛЯ: ${user.uid} ---`);
+                }
+            }
+            
+            // Обновляем отображение категорий (это скроет/покажет кнопки в них)
+            // setupCategoriesListener будет вызван в onAuthStateChanged, если есть доступ
+            if (isAdmin || isViewer) {
+                 // Если данные уже загружены, просто перерисовываем с нужными флагами
+                 if (categoriesContainer.innerHTML !== '') {
+                    setupCategoriesListener(isAdmin);
+                 }
+            } else {
+                // Если нет доступа, отписываемся и очищаем
+                if (unsubscribeCategories) {
+                    unsubscribeCategories();
+                    unsubscribeCategories = null;
+                }
+                categoriesContainer.innerHTML = '';
+            }
+        }
+
+
+        // --- Управление категориями ---
+
+        // Настройка слушателя категорий
+        function setupCategoriesListener(isAdmin) {
+            if (unsubscribeCategories) {
+                unsubscribeCategories(); 
+            }
+            
+            if (!categoriesCollectionRef) {
+                console.error("categoriesCollectionRef is not initialized!");
+                loadingIndicator.textContent = "Ошибка: ссылка на коллекцию не инициализирована.";
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            loadingIndicator.textContent = "Загрузка данных из Firebase..."; // Убедимся, что текст правильный
+            errorMessage.textContent = '';
+            
+            const q = query(categoriesCollectionRef);
+            
+            unsubscribeCategories = onSnapshot(q, (snapshot) => {
+                loadingIndicator.classList.add('hidden');
+                const categories = [];
+                snapshot.forEach(doc => {
+                    categories.push({ id: doc.id, ...doc.data() });
+                });
+                categories.sort((a, b) => a.name.localeCompare(b.name));
+                renderCategories(categories, isAdmin);
+            }, (error) => {
+                console.error("Error in onSnapshot listener:", error);
+                
+                // ОБНОВЛЕННАЯ ОБРАБОТКА ОШИБКИ
+                if (error.code === 'permission-denied') {
+                     loadingIndicator.textContent = "Ошибка: Отказано в доступе.";
+                     errorMessage.innerHTML = `
+                        Доступ к базе данных запрещен. 
+                        <br>Это ожидаемо, если вы вошли не как Админ или Пользователь.
+                        <br>Если вы *являетесь* Админом/Пользователем, проверьте:
+                        <br> 1. Правильно ли вставлены <strong>ADMIN_UID</strong> и <strong>VIEWER_UID</strong> в скрипте.
+                        <br> 2. Правильно ли настроены <strong>Правила Безопасности</strong> в Firebase.
+                     `;
+                } else {
+                    loadingIndicator.textContent = "Ошибка загрузки данных.";
+                    errorMessage.textContent = `Ошибка: ${error.message}.`;
+                }
+            });
+        }
+
+        // Добавление категории
+        addCategoryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const categoryName = categoryNameInput.value.trim();
+            if (categoryName && categoriesCollectionRef) {
+                try {
+                    await addDoc(categoriesCollectionRef, {
+                        name: categoryName,
+                        videos: [] 
+                    });
+                    categoryNameInput.value = ''; 
+                } catch (error) {
+                    console.error("Error adding category:", error);
+                }
+            }
+        });
+
+        // Редактирование названия категории
+        categoriesContainer.addEventListener('click', async (e) => {
+            const editBtn = e.target.closest('.edit-category-btn');
+            if (editBtn) {
+                const categoryId = editBtn.closest('[data-category-id]').dataset.categoryId;
+                const category = await getCategory(categoryId);
+                if (category) {
+                    const newName = prompt("Введите новое название категории:", category.name);
+                    if (newName && newName.trim() !== category.name) {
+                        try {
+                            const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+                            await updateDoc(categoryDocRef, { name: newName.trim() });
+                        } catch (error) {
+                            console.error("Error updating category name:", error);
+                        }
+                    }
+                }
+            }
+        });
+
+        // Удаление категории
+        categoriesContainer.addEventListener('click', async (e) => {
+            const deleteBtn = e.target.closest('.delete-category-btn');
+            if (deleteBtn) {
+                const categoryId = deleteBtn.closest('[data-category-id]').dataset.categoryId;
+                
+                const confirmed = await showCustomConfirm(
+                    "Удалить категорию?",
+                    "Вы уверены, что хотите удалить эту категорию и ВСЕ видео в ней? Это действие необратимо."
+                );
+
+                if (confirmed) {
+                    try {
+                        const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+                        await deleteDoc(categoryDocRef);
+                    } catch (error) {
+                        console.error("Error deleting category:", error);
+                    }
+                }
+            }
+        });
+
+        // --- Управление видео ---
+
+        // Показ модального окна (для добавления или редактирования)
+        categoriesContainer.addEventListener('click', async (e) => {
+            const addBtn = e.target.closest('.add-video-btn');
+            const editBtn = e.target.closest('.edit-video-btn');
+
+            if (addBtn) {
+                const categoryId = addBtn.closest('[data-category-id]').dataset.categoryId;
+                videoForm.reset();
+                videoModalTitle.textContent = "Добавить видео";
+                categoryIdInput.value = categoryId;
+                videoIdInput.value = ""; 
+                videoModal.classList.remove('hidden');
+            } else if (editBtn) {
+                const categoryId = editBtn.closest('[data-category-id]').dataset.categoryId;
+                const videoId = editBtn.dataset.videoId;
+                const category = await getCategory(categoryId);
+                if (category && category.videos) {
+                    const video = category.videos.find(v => v.id === videoId);
+                    if (video) {
+                        videoModalTitle.textContent = "Редактировать видео";
+                        categoryIdInput.value = categoryId;
+                        videoIdInput.value = video.id;
+                        videoNameInput.value = video.name || '';
+                        videoUrlInput.value = video.url || '';
+                        videoDescInput.value = video.description || '';
+                        videoModal.classList.remove('hidden');
+                    }
+                }
+            }
+        });
+
+        // Скрытие модального окна
+        function hideVideoModal() {
+            videoModal.classList.add('hidden');
+        }
+        cancelVideoModal.addEventListener('click', hideVideoModal);
+        closeVideoModal.addEventListener('click', hideVideoModal);
+
+        // Сохранение (добавление или обновление) видео
+        videoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const categoryId = categoryIdInput.value;
+            const videoId = videoIdInput.value; 
+            const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+
+            try {
+                const categorySnap = await getDoc(categoryDocRef);
+                if (!categorySnap.exists()) {
+                    throw new Error("Category not found");
+                }
+                
+                let videos = categorySnap.data().videos || [];
+                
+                if (videoId) {
+                    // Редактирование
+                    videos = videos.map(v => 
+                        v.id === videoId 
+                        ? { ...v, name: videoNameInput.value, url: videoUrlInput.value, description: videoDescInput.value }
+                        : v
+                    );
+                } else {
+                    // Добавление
+                    const newVideo = {
+                        id: crypto.randomUUID(), 
+                        name: videoNameInput.value,
+                        url: videoUrlInput.value,
+                        description: videoDescInput.value
+                    };
+                    videos.push(newVideo);
+                }
+                
+                await updateDoc(categoryDocRef, { videos: videos });
+                hideVideoModal();
+
+            } catch (error) {
+                console.error("Error saving video:", error);
+            }
+        });
+
+        // Удаление видео
+        categoriesContainer.addEventListener('click', async (e) => {
+            const deleteBtn = e.target.closest('.delete-video-btn');
+            if (deleteBtn) {
+                const categoryId = deleteBtn.closest('[data-category-id]').dataset.categoryId;
+                const videoId = deleteBtn.dataset.videoId;
+                
+                const confirmed = await showCustomConfirm(
+                    "Удалить видео?",
+                    "Вы уверены, что хотите удалить это видео?"
+                );
+
+                if (confirmed) {
+                    const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+                    try {
+                        const categorySnap = await getDoc(categoryDocRef);
+                        if (categorySnap.exists()) {
+                            let videos = categorySnap.data().videos || [];
+                            videos = videos.filter(v => v.id !== videoId); 
+                            await updateDoc(categoryDocRef, { videos: videos });
+                        }
+                    } catch (error) {
+                        console.error("Error deleting video:", error);
+                    }
+                }
+            }
+        });
+
+
+        // --- Аутентификация (ДОБАВЛЕН GOOGLE) ---
+        
+        // Вход через GitHub
+        async function signInWithGitHub() {
+            const provider = new GithubAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("GitHub sign-in error:", error);
+            }
+        }
+        
+        // Вход через Google
+        async function signInWithGoogle() {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Google sign-in error:", error);
+            }
+        }
+
+        // Выход
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                console.log("User signed out.");
+            } catch (error) {
+                console.error("Sign-out error:", error);
+            }
+        }
+        
+        // Назначаем обработчики на кнопки
+        signinButton.addEventListener('click', signInWithGitHub);
+        googleSigninButton.addEventListener('click', signInWithGoogle); // ДОБАВЛЕНО
+        signoutButton.addEventListener('click', signOutUser);
+
+
+        // --- Импорт / Экспорт / Сброс ---
+
+        // Импорт
+        importFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data || !Array.isArray(data.categories)) {
+                        throw new Error("Invalid JSON format. Expected { categories: [...] }");
+                    }
+                    
+                    const confirmed = await showCustomConfirm(
+                        "Начать импорт?",
+                        "ВНИМАНИЕ: Импорт добавит все категории из файла. Это может создать дубликаты. Продолжить?"
+                    );
+                    
+                    if (confirmed) {
+                        const batch = writeBatch(db);
+                        data.categories.forEach(category => {
+                            const newCategoryRef = doc(collection(db, categoriesCollectionRef.path));
+                            const newCategoryData = { ...category };
+                            delete newCategoryData.id; 
+                            
+                            if (Array.isArray(newCategoryData.videos)) {
+                                newCategoryData.videos = newCategoryData.videos.map(v => ({
+                                    ...v,
+                                    id: v.id || crypto.randomUUID()
+                                }));
+                            } else {
+                                newCategoryData.videos = [];
+                            }
+                            
+                            batch.set(newCategoryRef, newCategoryData);
+                        });
+                        await batch.commit();
+                        alert("Импорт успешно завершен!");
+                    }
+                } catch (error) {
+                    console.error("Error importing JSON:", error);
+                    alert(`Ошибка импорта: ${error.message}`);
+                } finally {
+                    event.target.value = null;
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Экспорт
+        exportButton.addEventListener('click', async () => {
+            try {
+                const snapshot = await getDocs(categoriesCollectionRef);
+                const categories = [];
+                snapshot.forEach(doc => {
+                    categories.push({ id: doc.id, ...doc.data() });
+                });
+                
+                const data = {
+                    categories: categories,
+                    exportedAt: new Date().toISOString()
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'dks5_youtube_archive.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error("Error exporting JSON:", error);
+                alert(`Ошибка экспорта: ${error.message}`);
+            }
+        });
+        
+        // Сброс данных
+        resetButton.addEventListener('click', async () => {
+            const confirmed1 = await showCustomConfirm(
+                "СБРОС ДАННЫХ",
+                "Вы уверены, что хотите УДАЛИТЬ ВСЕ категории и видео? Это действие НЕОБРАТИМО."
+            );
+            
+            if (!confirmed1) return;
+            
+            const confirmed2 = await showCustomConfirm(
+                "ПОСЛЕДНЕЕ ПРЕДУПРЕЖДЕНИЕ",
+                "Точно уверены? Все данные будут стерты навсегда."
+            );
+            
+            if (confirmed2) {
+                try {
+                    loadingIndicator.classList.remove('hidden');
+                    loadingIndicator.textContent = "Удаление данных...";
+                    
+                    const snapshot = await getDocs(categoriesCollectionRef);
+                    const batch = writeBatch(db);
+                    snapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    await batch.commit();
+                    
+                    loadingIndicator.classList.add('hidden');
+                    alert("Все данные успешно удалены.");
+                } catch (error) {
+                    console.error("Error resetting data:", error);
+                    alert(`Ошибка сброса: ${error.message}`);
+                    loadingIndicator.classList.add('hidden');
+                }
+            }
+        });
+
+
+        // --- Отрисовка (Рендеринг) ---
+        
+        // Рендер категорий
+        // (Логика отображения кнопок внутри renderCategories УЖЕ БЫЛА ПРАВИЛЬНОЙ)
+        function renderCategories(categories, isAdmin) {
+            categoriesContainer.innerHTML = ''; 
+            if (categories.length === 0) {
+                categoriesContainer.innerHTML = `
+                    <div class="text-center text-gray-400 py-10">
+                        <p class="text-xl">Категорий пока нет.</p>
+                        ${isAdmin ? '<strong>Создайте первую, используя форму выше.</strong>' : ''}
+                    </div>
+                `;
+                return;
+            }
+
+            categories.forEach(category => {
+                const categoryElement = document.createElement('div');
+                categoryElement.className = 'neo-glow-box p-6';
+                categoryElement.dataset.categoryId = category.id;
+
+                const sortedVideos = (category.videos || []).sort((a, b) => a.name.localeCompare(b.name));
+
+                const videosHtml = sortedVideos.map(video => `
+                    <div class="video-card bg-gray-800 rounded-lg p-4 shadow-lg flex flex-col h-full">
+                        <div class="flex-grow min-w-0">
+                            <a href="${escapeHTML(video.url || '#')}" target="_blank" rel="noopener noreferrer" class="text-lg font-semibold text-blue-300 hover:text-blue-200 break-words transition-all">
+                                ${escapeHTML(video.name || 'Без названия')}
+                                <ion-icon name="open-outline" class="inline-block text-sm ml-1"></ion-icon>
+                            </a>
+                            <p class="text-gray-400 text-sm mt-2 break-words">${escapeHTML(video.description || 'Нет описания')}</p>
+                        </div>
+                        
+                        <div class="flex-shrink-0 pt-4 mt-4 border-t border-gray-700" style="display: ${isAdmin ? 'block' : 'none'}">
+                            <div class="flex justify-end space-x-3">
+                                <button class="edit-video-btn text-gray-400 hover:text-yellow-400 transition-all" data-video-id="${video.id}" title="Редактировать">
+                                    <ion-icon name="create-outline" class="text-xl"></ion-icon>
+                                </button>
+                                <button class="delete-video-btn text-gray-400 hover:text-red-500 transition-all" data-video-id="${video.id}" title="Удалить">
+                                    <ion-icon name="trash-bin-outline" class="text-xl"></ion-icon>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                categoryElement.innerHTML = `
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+                        <h3 class="text-3xl font-bold text-violet-300 break-words">${escapeHTML(category.name)}</h3>
+                        <div class="flex space-x-2 flex-shrink-0" style="display: ${isAdmin ? 'flex' : 'none'}">
+                            <button class="edit-category-btn text-yellow-400 hover:text-yellow-300 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-all" title="Редактировать название">
+                                <ion-icon name="pencil-outline" class="text-xl"></ion-icon>
+                            </button>
+                            <button class="delete-category-btn text-red-500 hover:text-red-400 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-all" title="Удалить категорию">
+                                <ion-icon name="trash-outline" class="text-xl"></ion-icon>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="video-list grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                        ${videosHtml} </div>
+                    
+                    ${videosHtml.length === 0 ? `<p class="text-gray-500 text-center py-4">В этой категории пока нет видео.</p>` : ''}
+                    
+                    <button class="add-video-btn bg-green-600 hover:bg-green-500 text-white font-semibold py-2 px-5 rounded-lg transition-all flex items-center space-x-2" style="display: ${isAdmin ? 'flex' : 'none'}">
+                        <ion-icon name="add-outline"></ion-icon>
+                        <span>Добавить видео</span>
+                    </button>
+                `;
+                categoriesContainer.appendChild(categoryElement);
+            });
+        }
+
+
+        // --- Вспомогательные функции ---
+
+        // Экранирование HTML
+        function escapeHTML(str) {
+            if (typeof str !== 'string') return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[m];
+            });
+        }
+        
+        // Получение данных одной категории
+        async function getCategory(categoryId) {
+            if (!categoriesCollectionRef) return null;
+            try {
+                const categoryDocRef = doc(categoriesCollectionRef, categoryId);
+                const categorySnap = await getDoc(categoryDocRef);
+                return categorySnap.exists() ? { id: categorySnap.id, ...categorySnap.data() } : null;
+            } catch (error) {
+                console.error("Error getting category:", error);
+                return null;
+            }
+        }
+        
+        // Кастомный Promise-based confirm
+        function showCustomConfirm(title, text) {
+            return new Promise((resolve) => {
+                confirmTitle.textContent = title;
+                confirmText.textContent = text;
+                confirmModal.classList.remove('hidden');
+                
+                confirmResolve = resolve; 
+            });
+        }
+        
+        confirmOk.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            if (confirmResolve) confirmResolve(true);
+        });
+        
+        confirmCancel.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            if (confirmResolve) confirmResolve(false);
+        });
+
+
+        // --- Запуск приложения ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+        });
+    </script>
+</body>
+</html>
