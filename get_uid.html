@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Get Google UID</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white p-10">
+    <h1 class="text-2xl mb-4">Тест входа Google (Аккаунт №2)</h1>
+    <button id="google-signin-button" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg">
+        Войти через Google (Аккаунт №2)
+    </button>
+    <p id="message" class="mt-4 font-mono"></p>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            GoogleAuthProvider,
+            signInWithPopup,
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // ВАША КОНФИГУРАЦИЯ (из вашего файла youtube-archive (2).html)
+        const MANUAL_FIREBASE_CONFIG = {
+            "apiKey": "AIzaSyAI2eGIMAHw3LWpRTATXBd2di6d2nJoj2w",
+            "authDomain": "archive-89fc1.firebaseapp.com",
+            "projectId": "archive-89fc1",
+            "storageBucket": "archive-89fc1.firebasestorage.app",
+            "messagingSenderId": "1023136270041",
+            "appId": "1:1023136270041:web:02af4902a9d9f53c4920c8"
+        };
+        
+        const app = initializeApp(MANUAL_FIREBASE_CONFIG);
+        const auth = getAuth(app);
+        
+        const googleBtn = document.getElementById('google-signin-button');
+        const messageEl = document.getElementById('message');
+
+        // Обработчик входа
+        googleBtn.addEventListener('click', async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Google sign-in error:", error);
+                messageEl.textContent = `Ошибка: ${error.message}`;
+            }
+        });
+
+        // Слушатель
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("--- ВАШ GOOGLE UID (для Шага 3):", user.uid, "---");
+                messageEl.innerHTML = `Вы вошли как: ${user.displayName}. <br><br>ВАШ UID (скопируйте его): <br><strong class="text-green-400 text-lg">${user.uid}</strong>`;
+                googleBtn.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
